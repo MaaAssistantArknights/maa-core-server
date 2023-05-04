@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "node",
@@ -9,10 +10,24 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
     "lib": ["ESNext"],
     "paths": {
       "@mcs/ffi/*": ["./packages/ffi/src/*"],
       "@mcs/utils/*": ["./packages/utils/src/*"]
+    },
+    "outDir": "./dist"
+  },
+  "references": [
+    {
+      "path": "./packages/ffi",
+    },
+    {
+      "path": "./packages/server",
+    },
+    {
+      "path": "./packages/utils",
     }
-  }
+  ]
 }
