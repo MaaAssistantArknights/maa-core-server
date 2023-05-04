@@ -18,14 +18,6 @@ export const useFFI: UseServerModule = app => {
     }
   > = {}
 
-  app.get('/api/version', (req, res) => {
-    res.send(
-      makeSuccess({
-        version: loader.GetVersion() ?? 'N/A',
-      })
-    )
-  })
-
   app.post('/api/listen', (req, res) => {
     const uuid = req.body.uuid as string
 
@@ -141,6 +133,92 @@ export const useFFI: UseServerModule = app => {
 
     instData[uuid].wrapper.Destroy()
     delete instData[uuid]
+
+    res.send(makeSuccess({}))
+  })
+
+  app.post('/api/configInstance', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        status: instData[uuid].wrapper.SetInstanceOption(
+          req.body.key as number,
+          req.body.value as string
+        ),
+      })
+    )
+  })
+
+  app.post('/api/appendTask', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        taskId: instData[uuid].wrapper.AppendTask(
+          req.body.type as string,
+          JSON.stringify(req.body.param)
+        ),
+      })
+    )
+  })
+
+  app.post('/api/configTask', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        status: instData[uuid].wrapper.SetTaskParam(
+          req.body.id as number,
+          JSON.stringify(req.body.param)
+        ),
+      })
+    )
+  })
+
+  app.post('/api/start', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        status: instData[uuid].wrapper.Start(),
+      })
+    )
+  })
+
+  app.post('/api/stop', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        status: instData[uuid].wrapper.Stop(),
+      })
+    )
   })
 
   app.post('/api/connect', (req, res) => {
@@ -161,6 +239,75 @@ export const useFFI: UseServerModule = app => {
       }
       return true
     })
+  })
+
+  app.post('/api/click', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    const d = instData[uuid]
+
+    const callId = d.wrapper.AsyncClick(req.body.x as number, req.body.y as number)
+    d.bind.push((code, data) => {
+      if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
+        res.send(makeSuccess({}))
+        return false
+      }
+      return true
+    })
+  })
+
+  app.post('/api/screencap', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    const d = instData[uuid]
+
+    const callId = d.wrapper.AsyncScreencap()
+    d.bind.push((code, data) => {
+      if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
+        res.send(makeSuccess({}))
+        return false
+      }
+      return true
+    })
+  })
+
+  app.post('/api/image', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(
+      makeSuccess({
+        data: instData[uuid].wrapper.GetImage(),
+      })
+    )
+  })
+
+  app.get('/api/version', (req, res) => {
+    res.send(
+      makeSuccess({
+        version: loader.GetVersion() ?? 'N/A',
+      })
+    )
+  })
+
+  app.post('/api/log', (req, res) => {
+    loader.Log(req.body.level as string, req.body.message as string)
+
+    res.send(makeSuccess({}))
   })
 
   return {
