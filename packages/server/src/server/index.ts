@@ -36,24 +36,21 @@ export class Server {
     this.modules.push(useDevice(this.server))
   }
 
-  listen(port = 5555) {
+  init() {
     this.modules.forEach(m => {
       m.init?.()
     })
+  }
 
-    const svr = this.server.listen(port, () => {
+  deinit() {
+    this.modules.forEach(m => {
+      m.deinit?.()
+    })
+  }
+
+  listen(port = 5555) {
+    return this.server.listen(port, () => {
       logger.express.info(`Server listen on ${port} started`)
     })
-
-    return () => {
-      this.modules.forEach(m => {
-        m.deinit?.()
-      })
-      return new Promise<void>(resolve => {
-        svr.close(() => {
-          resolve()
-        })
-      })
-    }
   }
 }
