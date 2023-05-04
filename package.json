@@ -5,7 +5,8 @@
     "packages/**"
   ],
   "scripts": {
-    "dev": "tsx packages/server/src/index"
+    "dev": "tsx packages/server/src/index",
+    "test": "tsx packages/test/src/index"
   },
   "devDependencies": {
     "tsx": "^3.12.7"

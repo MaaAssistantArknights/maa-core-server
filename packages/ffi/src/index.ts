@@ -42,7 +42,6 @@ const AsstPtrType = ref.refType(AsstType)
 // const TaskPtrType = ref.refType(AsstType)
 const BuffType = ref.refType(ref.types.void)
 const CustomArgsType = BuffType
-const IntPointerType = ref.refType(IntType)
 
 /**
 const CallBackType = ffi.Function(ref.types.void, [

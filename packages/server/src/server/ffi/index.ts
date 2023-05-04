@@ -7,14 +7,16 @@ import { makeSuccess, makeError } from '../utils'
 export const useFFI: UseServerModule = app => {
   const loader = new CoreLoader()
 
-  const callbacks: Record<string, Buffer> = {}
-  const callbackBind: Record<
+  const instData: Record<
     string,
-    ((code: number, data: Record<string, string | number>) => boolean)[]
+    {
+      callback: Buffer
+      counter: number
+      bind: ((code: number, data: Record<string, unknown>) => boolean)[]
+      cache: Record<number, [number, Record<string, unknown>][]>
+      wrapper: InstanceWrapper
+    }
   > = {}
-  const callbackCounter: Record<string, number> = {}
-  const callbackCache: Record<string, [number, Record<string, unknown>][]> = {}
-  const wrappers: Record<string, InstanceWrapper> = {}
 
   app.get('/api/version', (req, res) => {
     res.send(
@@ -24,25 +26,26 @@ export const useFFI: UseServerModule = app => {
     )
   })
 
-  app.get('/api/listen', (req, res) => {
-    const uuid = req.query.uuid as string
+  app.post('/api/listen', (req, res) => {
+    const uuid = req.body.uuid as string
 
-    if (!(uuid in wrappers)) {
+    if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const id = callbackCounter[uuid]
-    callbackCounter[uuid] = id + 1
-    const multiId = `${uuid}/${id}`
-    callbackCache[multiId] = []
+    const d = instData[uuid]
 
-    callbackBind[uuid].push((code, data) => {
-      const keep = multiId in callbackCache
+    const id = d.counter
+    d.counter = id + 1
+    d.cache[id] = []
+
+    d.bind.push((code, data) => {
+      const keep = id in d.cache
       if (!keep) {
         return false
       }
-      callbackCache[multiId].push([code, data])
+      d.cache[id].push([code, data])
       return true
     })
     res.send(
@@ -52,21 +55,20 @@ export const useFFI: UseServerModule = app => {
     )
   })
 
-  app.get('/api/unlisten', (req, res) => {
-    const uuid = req.query.uuid as string
+  app.post('/api/unlisten', (req, res) => {
+    const uuid = req.body.uuid as string
 
-    if (!(uuid in wrappers)) {
+    if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const id = req.query.id as string
-    const multiId = `${uuid}/${id}`
+    const id = req.body.id as number
 
-    const rest = callbackCache[multiId] ?? []
-    if (multiId in callbackCache) {
-      delete callbackCache[multiId]
-    }
+    const d = instData[uuid]
+
+    const rest = d.cache[id]
+    delete d.cache[id]
     res.send(
       makeSuccess({
         rest,
@@ -74,74 +76,85 @@ export const useFFI: UseServerModule = app => {
     )
   })
 
-  app.get('/api/poll', (req, res) => {
-    const uuid = req.query.uuid as string
+  app.post('/api/poll', (req, res) => {
+    const uuid = req.body.uuid as string
 
-    if (!(uuid in wrappers)) {
+    if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const id = req.query.id as string
-    const multiId = `${uuid}/${id}`
+    const id = req.body.id as number
+    const peek = ((req.body.peek as string | undefined) ?? '1') !== '0'
+    const count = parseInt((req.body.count as string | undefined) ?? '1')
 
-    const peek = ((req.query.peek as string | undefined) ?? '1') !== '0'
-    const count = parseInt((req.query.count as string | undefined) ?? '1')
+    const d = instData[uuid]
 
-    let data: (typeof callbackCache)[string] = []
+    let result: (typeof d.cache)[number] = []
     if (peek) {
-      data = callbackCache[multiId].slice(0, count)
+      result = d.cache[id].slice(0, count)
     } else {
-      data = callbackCache[multiId].splice(0, count)
+      result = d.cache[id].splice(0, count)
     }
     res.send(
       makeSuccess({
-        data,
+        result,
       })
     )
   })
 
-  app.get('/api/create', (req, res) => {
-    const uuid = req.query.uuid as string
-    const touchMode = (req.query.touch as string | undefined) ?? 'minitouch'
+  app.post('/api/create', (req, res) => {
+    const uuid = req.body.uuid as string
+    const touchMode = (req.body.touch as string | undefined) ?? 'minitouch'
 
-    callbacks[uuid] = CoreLoader.bindCallback((code, data) => {
+    const callback = CoreLoader.bindCallback((code, data) => {
       logger.ffi.info('Callback called with', code, data)
       const pdata = JSON.parse(data)
-      callbackBind[uuid] =
-        callbackBind[uuid]?.filter(fn => {
+      instData[uuid].bind =
+        instData[uuid].bind?.filter(fn => {
           return fn(code, pdata)
         }) ?? []
     })
 
-    const wrapper = loader.CreateEx(callbacks[uuid])
+    const wrapper = loader.CreateEx(callback)
 
     wrapper.SetInstanceOption(2, touchMode)
 
-    wrappers[uuid] = wrapper
-
-    callbackBind[uuid] = []
-    callbackCounter[uuid] = 0
+    instData[uuid] = {
+      callback,
+      counter: 0,
+      bind: [],
+      cache: {},
+      wrapper,
+    }
 
     res.send(makeSuccess({}))
   })
 
-  app.post('/api/connect', (req, res) => {
-    const body = req.body as {
-      uuid: string
-      address: string
-      config: string
-    }
+  app.post('/api/destroy', (req, res) => {
+    const uuid = req.body.uuid as string
 
-    const uuid = body.uuid
-
-    if (!(uuid in wrappers)) {
+    if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const callId = wrappers[uuid].AsyncConnect(defaultAdb, body.address ?? '', body.config ?? '')
-    callbackBind[uuid].push((code, data) => {
+    instData[uuid].wrapper.Destroy()
+    delete instData[uuid]
+  })
+
+  app.post('/api/connect', (req, res) => {
+    const uuid = req.body.uuid as string
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    const d = instData[uuid]
+
+    const callId = d.wrapper.AsyncConnect(defaultAdb, req.body.address ?? '', req.body.config ?? '')
+    d.bind.push((code, data) => {
       if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
         res.send(makeSuccess(data))
         return false
