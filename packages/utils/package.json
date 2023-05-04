@@ -1,0 +1,12 @@
+{
+  "name": "@mcs/utils",
+  "main": "src/index.ts",
+  "dependencies": {
+    "execa": "^7.1.1",
+    "iconv-lite": "^0.6.3",
+    "log4js": "^6.9.1"
+  },
+  "devDependencies": {
+    "@types/execa": "^2.0.0"
+  }
+}

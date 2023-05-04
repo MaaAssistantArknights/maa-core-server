@@ -1,0 +1,13 @@
+{
+  "name": "maa-core-server",
+  "author": "MAA Maintainer Group",
+  "workspaces": [
+    "packages/**"
+  ],
+  "scripts": {
+    "dev": "tsx packages/server/src/index"
+  },
+  "devDependencies": {
+    "tsx": "^3.12.7"
+  }
+}
