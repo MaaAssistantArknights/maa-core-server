@@ -323,6 +323,11 @@ export const useFFI: UseServerModule = app => {
       loader.LoadResource(cfg.core.path)
     },
     deinit: () => {
+      for (const uuid of Object.keys(instData)) {
+        instData[uuid].wrapper.Stop()
+        instData[uuid].wrapper.Destroy()
+        delete instData[uuid]
+      }
       // TODO: STOP TASKS
       loader.dispose()
     },
