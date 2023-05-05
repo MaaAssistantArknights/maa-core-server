@@ -6,9 +6,20 @@
   ],
   "scripts": {
     "dev": "tsx packages/server/src/index",
-    "test": "tsx packages/test/src/index"
+    "test": "tsx packages/test/src/index",
+    "build": "esbuild --platform=node --bundle packages/server/src/index.ts --outfile=dist/index.js --external:@tigerconnect/ref-napi --external:@tigerconnect/ffi-napi",
+    "pack": "pkg . -t node18-win-x64"
+  },
+  "bin": "dist/index.js",
+  "pkg": {
+    "assets": [
+      "node_modules/@tigerconnect/ffi-napi/**/*",
+      "node_modules/@tigerconnect/ref-napi/**/*"
+    ]
   },
   "devDependencies": {
+    "esbuild": "^0.17.18",
+    "pkg": "^5.8.1",
     "tsx": "^3.12.7"
   }
 }
