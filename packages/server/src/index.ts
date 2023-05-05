@@ -1,3 +1,4 @@
+import path from 'node:path'
 import fs from 'node:fs'
 import cluster, { Worker } from 'node:cluster'
 
@@ -6,12 +7,24 @@ import express, { json } from 'express'
 import { logger } from '@mcs/utils'
 
 import { Server } from './server'
+import type { GlobalConfig } from './types'
 
-const cfg: Record<'service' | 'manager', { port: number }> = fs.existsSync('config.json')
-  ? JSON.parse(fs.readFileSync('config.json', 'utf-8'))
+export const cfg: GlobalConfig = fs.existsSync('config.json')
+  ? (JSON.parse(fs.readFileSync('config.json', 'utf-8')) as GlobalConfig)
   : {
-      service: 13319,
-      manager: 13320,
+      service: {
+        port: 13319,
+      },
+      manager: {
+        port: 13320,
+      },
+      core: {
+        path: path.join('depends', 'core'),
+      },
+      adb: {
+        path: path.join('depends', 'platform-tools'),
+      },
+      forkOnStart: false,
     }
 
 if (cluster.isWorker) {
@@ -28,6 +41,10 @@ if (cluster.isWorker) {
   })
 } else {
   let worker: Worker | null = null
+
+  if (cfg.forkOnStart) {
+    worker = cluster.fork()
+  }
 
   const app = express()
   app.use(json())
@@ -50,35 +67,40 @@ if (cluster.isWorker) {
   })
 
   async function stop() {
-    if (worker) {
+    if (worker && !worker.isDead()) {
       const pro = new Promise<void>(resolve => {
         waitingStop = resolve
       })
       worker.destroy('SIGTERM')
       await pro
+      return true
+    } else {
+      return false
     }
   }
 
   function start() {
+    if (worker && !worker.isDead()) {
+      return false
+    }
     worker = cluster.fork()
+    return true
   }
 
   app.get('/start', (req, res) => {
-    if (worker && !worker.isDead()) {
-      res.send({
-        status: 'already running',
-      })
-    } else {
-      worker = cluster.fork()
+    if (start()) {
       res.send({
         status: 'ok',
+      })
+    } else {
+      res.send({
+        status: 'already running',
       })
     }
   })
 
   app.get('/stop', async (req, res) => {
-    if (worker && !worker.isDead()) {
-      await stop()
+    if (await stop()) {
       res.send({
         status: 'ok',
       })
@@ -90,16 +112,26 @@ if (cluster.isWorker) {
   })
 
   app.get('/restart', async (req, res) => {
-    if (worker && !worker.isDead()) {
-      await stop()
-    }
+    await stop()
     start()
     res.send({
       status: 'ok',
     })
   })
 
-  app.listen(cfg.manager.port, () => {
+  app.get('/exit', async (req, res) => {
+    await stop()
+    res.send({
+      status: 'ok',
+    })
+    console.log('Close server')
+    server.close(() => {
+      console.log('Exit')
+      process.exit(0)
+    })
+  })
+
+  const server = app.listen(cfg.manager.port, () => {
     logger.default.info('Manage server listen on', cfg.manager.port)
   })
 }

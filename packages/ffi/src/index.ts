@@ -2,8 +2,6 @@ import path from 'node:path'
 import ffi from '@tigerconnect/ffi-napi'
 import ref from '@tigerconnect/ref-napi'
 
-import { dependencesPrefix } from '@mcs/utils'
-
 import { createWrapper } from './proxy'
 
 export * from './types'
@@ -218,15 +216,13 @@ function extractFunction(coreLib: ffi.DynamicLibrary) {
   return funcs
 }
 
-const corePrefixDefault = path.join(dependencesPrefix, 'core')
-
 export class CoreLoader {
   loaded: boolean = false
   private depLibs!: ffi.DynamicLibrary[]
   private coreLib!: ffi.DynamicLibrary
   private coreLibInterface!: ReturnType<typeof extractFunction>
 
-  load(prefix = corePrefixDefault) {
+  load(prefix: string) {
     const platform = process.platform
     if (!checkPlatform(platform)) {
       console.log(`Platform ${platform} not supported`)
@@ -259,11 +255,6 @@ export class CoreLoader {
       console.error((err as Error).message)
       return false
     }
-  }
-
-  config(resource = corePrefixDefault, userdir = '.') {
-    this.SetUserDir(userdir)
-    this.LoadResource(resource)
   }
 
   SetUserDir(path: string) {

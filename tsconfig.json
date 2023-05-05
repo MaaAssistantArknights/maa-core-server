@@ -15,7 +15,8 @@
     "lib": ["ESNext"],
     "paths": {
       "@mcs/ffi/*": ["./packages/ffi/src/*"],
-      "@mcs/utils/*": ["./packages/utils/src/*"]
+      "@mcs/utils/*": ["./packages/utils/src/*"],
+      "@mcs/server/*": ["./packages/server/src/*"]
     },
     "outDir": "./dist"
   }

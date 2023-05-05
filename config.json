@@ -4,5 +4,12 @@
   },
   "manager": {
     "port": 13320
-  }
+  },
+  "core": {
+    "path": "depends/core"
+  },
+  "adb": {
+    "path": "depends/platform-tools"
+  },
+  "forkOnStart": true
 }

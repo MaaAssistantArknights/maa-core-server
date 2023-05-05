@@ -1,8 +1,9 @@
 import { AsstMsg, CoreLoader, type InstanceWrapper } from '@mcs/ffi'
-import { defaultAdb, logger } from '@mcs/utils'
+import { getDefaultAdb, logger } from '@mcs/utils'
 
 import type { UseServerModule } from '../types'
 import { makeSuccess, makeError } from '../utils'
+import { cfg } from '../..'
 
 export const useFFI: UseServerModule = app => {
   const loader = new CoreLoader()
@@ -231,7 +232,11 @@ export const useFFI: UseServerModule = app => {
 
     const d = instData[uuid]
 
-    const callId = d.wrapper.AsyncConnect(defaultAdb, req.body.address ?? '', req.body.config ?? '')
+    const callId = d.wrapper.AsyncConnect(
+      getDefaultAdb(),
+      req.body.address ?? '',
+      req.body.config ?? ''
+    )
     d.bind.push((code, data) => {
       if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
         res.send(makeSuccess(data))
@@ -313,8 +318,9 @@ export const useFFI: UseServerModule = app => {
   return {
     init: () => {
       logger.ffi.info('Express module inited')
-      loader.load()
-      loader.config()
+      loader.load(cfg.core.path)
+      loader.SetUserDir('.')
+      loader.LoadResource(cfg.core.path)
     },
     deinit: () => {
       // TODO: STOP TASKS

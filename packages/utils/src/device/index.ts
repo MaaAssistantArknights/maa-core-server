@@ -1,5 +1,5 @@
 export type { Emulator } from './types'
-export { defaultAdb } from './utils'
+export { getDefaultAdb } from './utils'
 
 export async function getEmulators() {
   const platform = process.platform

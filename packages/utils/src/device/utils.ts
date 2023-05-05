@@ -1,14 +1,19 @@
 import path from 'node:path'
 import { execa } from 'execa'
 
-import { dependencesPrefix } from '../config'
+import { cfg } from '@mcs/server'
+
 import { logger } from '../logger'
 
 const exeSuffix = process.platform === 'win32' ? '.exe' : ''
 
-export const defaultAdb = path.join(dependencesPrefix, 'platform-tools', `adb${exeSuffix}`)
+export function getDefaultAdb() {
+  return path.resolve(cfg.adb.path, `adb${exeSuffix}`)
+}
 
-export async function getUuid(address: string, adb = defaultAdb) {
+export async function getUuid(address: string) {
+  const adb = getDefaultAdb()
+
   const { stdout: connectResult } = await execa(adb, ['connect', address])
   if (!/connected/.test(connectResult)) {
     return null

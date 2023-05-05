@@ -8,7 +8,7 @@
     "dev": "tsx packages/server/src/index",
     "test": "tsx packages/test/src/index",
     "build": "esbuild --platform=node --bundle packages/server/src/index.ts --outfile=dist/index.js --external:@tigerconnect/ref-napi --external:@tigerconnect/ffi-napi",
-    "pack": "pkg . -t node18-win-x64"
+    "pack": "npm run build && pkg . -t node18-win-x64 -C GZip"
   },
   "bin": "dist/index.js",
   "pkg": {
