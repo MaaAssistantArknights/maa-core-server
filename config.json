@@ -1,0 +1,8 @@
+{
+  "service": {
+    "port": 13319
+  },
+  "manager": {
+    "port": 13320
+  }
+}

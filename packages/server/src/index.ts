@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import cluster, { Worker } from 'node:cluster'
 
 import express, { json } from 'express'
@@ -6,12 +7,18 @@ import { logger } from '@mcs/utils'
 
 import { Server } from './server'
 
+const cfg: Record<'service' | 'manager', { port: number }> = fs.existsSync('config.json')
+  ? JSON.parse(fs.readFileSync('config.json', 'utf-8'))
+  : {
+      service: 13319,
+      manager: 13320,
+    }
+
 if (cluster.isWorker) {
   const server = new Server()
 
   server.init()
-  const s = server.listen()
-  logger.worker.info('Server started')
+  const s = server.listen(cfg.service.port)
 
   process.on('SIGTERM', () => {
     s.close(() => {
@@ -92,5 +99,7 @@ if (cluster.isWorker) {
     })
   })
 
-  app.listen(8080)
+  app.listen(cfg.manager.port, () => {
+    logger.default.info('Manage server listen on', cfg.manager.port)
+  })
 }

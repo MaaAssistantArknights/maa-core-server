@@ -48,7 +48,7 @@ export class Server {
     })
   }
 
-  listen(port = 5555) {
+  listen(port: number) {
     return this.server.listen(port, () => {
       logger.express.info(`Server listen on ${port} started`)
     })

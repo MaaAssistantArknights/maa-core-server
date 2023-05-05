@@ -18,16 +18,5 @@
       "@mcs/utils/*": ["./packages/utils/src/*"]
     },
     "outDir": "./dist"
-  },
-  "references": [
-    {
-      "path": "./packages/ffi",
-    },
-    {
-      "path": "./packages/server",
-    },
-    {
-      "path": "./packages/utils",
-    }
-  ]
+  }
 }
