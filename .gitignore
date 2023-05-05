@@ -2,4 +2,4 @@ node_modules
 depends
 debug
 dist
-maa-core-server.log
+maa-core-server*
