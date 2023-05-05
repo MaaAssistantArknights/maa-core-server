@@ -17,6 +17,7 @@ log4js.configure({
 
 export const logger = {
   default: log4js.getLogger(),
+  adapter: log4js.getLogger('adapter'),
   express: log4js.getLogger('express'),
   ffi: log4js.getLogger('ffi'),
   worker: log4js.getLogger('worker'),

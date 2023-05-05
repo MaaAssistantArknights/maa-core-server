@@ -6,6 +6,6 @@ export interface Emulator {
   adbPath?: string // "E://bluestack//HD-Adb.exe"
   address?: string // "127.0.0.1:11451"
   uuid?: string
-  commandLine?: [string, string[]] // 命令行启动参数
+  commandLine?: [string, string[]] | string // 命令行启动参数
   emulatorPath?: string // 模拟器路径
 }
