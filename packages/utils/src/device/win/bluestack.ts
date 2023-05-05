@@ -42,14 +42,6 @@ export async function getBluestack(emulator: Emulator): Promise<boolean> {
 
   const instanceName = getInstanceName(cmd)
 
-  const confPath = path.join(
-    path.normalize(
-      (await queryRegistry('HKEY_LOCAL_MACHINE\\SOFTWARE\\BlueStacks_nxt', 'UserDefinedDir'))
-        .UserDefinedDir
-    ),
-    'bluestacks.conf'
-  )
-
   if (root.includes('BluestacksCN')) {
     // 蓝叠CN特供版本 读注册表 Computer\HKEY_LOCAL_MACHINE\SOFTWARE\BlueStacks_china_gmgr\Guests\Android\Network\0 中的InboundRules
     // 搞两套方案，先读注册表拿adb端口, 如果读失败了可能是打包复制导致，再使用 netstat 尝试
@@ -87,6 +79,7 @@ export async function getBluestack(emulator: Emulator): Promise<boolean> {
     if (success) {
       return true
     }
+
     // 通过读注册表失败, 使用 netstat 抓一个5开头的端口充数
     const regExp = '\\s*TCP\\s*127.0.0.1:(5\\d{3,4})\\s*' // 提取端口
     const matchResult = (
@@ -96,28 +89,39 @@ export async function getBluestack(emulator: Emulator): Promise<boolean> {
     emulator.address = matchResult ? `127.0.0.1:${matchResult[1]}` : '127.0.0.1:5555'
     emulator.displayName = 'BlueStack CN [no regedit]'
     return true
+  }
+
+  const regKey = root.includes('BlueStacks_nxt_cn') ? 'BlueStacks_nxt_cn' : 'BlueStacks_nxt'
+
+  const confPath = path.join(
+    path.normalize(
+      (await queryRegistry(`HKEY_LOCAL_MACHINE\\SOFTWARE\\${regKey}`, 'UserDefinedDir'))
+        .UserDefinedDir
+    ),
+    'bluestacks.conf'
+  )
+
+  if (!existsSync(confPath)) {
+    logger.adapter.error(`bluestacks.conf not exist! path`, confPath)
+    return false
+  }
+  const conf = await fs.readFile(confPath, 'utf-8')
+
+  const confPortInstanceExp = instanceName
+    ? new RegExp(`bst.instance.${instanceName}.status.adb_port="(\\d{4,6})"`)
+    : /bst.instance.(?:.*).status.adb_port="(\d{4,6})"/
+  const confPort = conf.match(confPortInstanceExp)
+  logger.adapter.info('Bluestack confport', confPort)
+
+  emulator.displayName = 'BlueStack Global'
+  if (confPort) {
+    emulator.address = `127.0.0.1:${confPort[1]}`
   } else {
-    if (!existsSync(confPath)) {
-      logger.adapter.error(`bluestacks.conf not exist! path`, confPath)
-      return false
-    }
-    const conf = await fs.readFile(confPath, 'utf-8')
-
-    const confPortInstanceExp = instanceName
-      ? new RegExp(`bst.instance.${instanceName}.status.adb_port="(\\d{4,6})"`)
-      : /bst.instance.(?:.*).status.adb_port="(\d{4,6})"/
-    const confPort = conf.match(confPortInstanceExp)
-    logger.adapter.info('Bluestack confport', confPort)
-
-    emulator.displayName = 'BlueStack Global'
-    if (confPort) {
-      emulator.address = `127.0.0.1:${confPort[1]}`
-    } else {
-      // fallback
-      emulator.address = '127.0.0.1:5555'
-    }
-    return true
-    /**
+    // fallback
+    emulator.address = '127.0.0.1:5555'
+  }
+  return true
+  /**
     e.tag = 'BlueStack Global';
     [...conf.matchAll(confPortExp)]
       .filter(async (v) => {
@@ -135,6 +139,4 @@ export async function getBluestack(emulator: Emulator): Promise<boolean> {
       })
   }
    */
-  }
-  // return e
 }
