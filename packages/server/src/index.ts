@@ -119,19 +119,31 @@ if (cluster.isWorker) {
     })
   })
 
-  app.get('/exit', async (req, res) => {
-    await stop()
-    res.send({
-      status: 'ok',
-    })
+  function exit() {
     console.log('Close server')
     server.close(() => {
       console.log('Exit')
       process.exit(0)
     })
+  }
+
+  app.get('/exit', async (req, res) => {
+    await stop()
+    res.send({
+      status: 'ok',
+    })
+    exit()
   })
 
   const server = app.listen(cfg.manager.port, () => {
     logger.default.info('Manage server listen on', cfg.manager.port)
+  })
+
+  process.stdin.setRawMode(true)
+  process.stdin.on('data', async d => {
+    if (d.at(0) === 0x1b) {
+      await stop()
+      exit()
+    }
   })
 }

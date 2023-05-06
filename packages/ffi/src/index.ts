@@ -343,7 +343,7 @@ export class CoreLoader {
     const buf = Buffer.alloc(preAlloc) as typeVoidPointer
     // 假设总是可以装下, 且不会超过uint32
     const len = this.coreLibInterface.AsstGetUUID(instance, buf, buf.length) as number
-    return buf.slice(0, len).toString('utf-8')
+    return buf.subarray(0, len).toString('utf-8')
   }
 
   GetVersion() {

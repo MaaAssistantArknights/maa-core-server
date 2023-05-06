@@ -1,9 +1,23 @@
 import { AsstMsg, CoreLoader, type InstanceWrapper } from '@mcs/ffi'
 import { getDefaultAdb, logger } from '@mcs/utils'
+import { validate } from '@mcs/server/schema'
 
 import type { UseServerModule } from '../types'
 import { makeSuccess, makeError } from '../utils'
 import { cfg } from '../..'
+import type { Response } from 'express'
+
+type CallbackType = (code: number, data: Record<string, unknown>) => boolean
+
+function makeAsyncCallTracker(id: number, res: Response): CallbackType {
+  return (code, data) => {
+    if (code === AsstMsg.AsyncCallInfo && data.async_call_id === id) {
+      res.send(makeSuccess(data))
+      return false
+    }
+    return true
+  }
+}
 
 export const useFFI: UseServerModule = app => {
   const loader = new CoreLoader()
@@ -13,14 +27,19 @@ export const useFFI: UseServerModule = app => {
     {
       callback: Buffer
       counter: number
-      bind: ((code: number, data: Record<string, unknown>) => boolean)[]
-      cache: Record<number, [number, Record<string, unknown>][]>
+      bind: CallbackType[]
+      cache: Record<number, Parameters<CallbackType>[]>
       wrapper: InstanceWrapper
     }
   > = {}
 
   app.post('/api/listen', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Listen', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -49,14 +68,19 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/unlisten', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Unlisten', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const id = req.body.id as number
+    const id = data.id
 
     const d = instData[uuid]
 
@@ -70,16 +94,21 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/poll', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Poll', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
       return
     }
 
-    const id = req.body.id as number
-    const peek = ((req.body.peek as string | undefined) ?? '1') !== '0'
-    const count = parseInt((req.body.count as string | undefined) ?? '1')
+    const id = data.id
+    const peek = data.peek ?? true
+    const count = data.count ?? 1
 
     const d = instData[uuid]
 
@@ -97,8 +126,13 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/create', (req, res) => {
-    const uuid = req.body.uuid as string
-    const touchMode = (req.body.touch as string | undefined) ?? 'minitouch'
+    const { success, errors, data } = validate('Create', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
+    const touchMode = data.touchMode ?? 'minitouch'
 
     const callback = CoreLoader.bindCallback((code, data) => {
       logger.ffi.info('Callback called with', code, data)
@@ -125,7 +159,12 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/destroy', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Destroy', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -139,7 +178,12 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/configInstance', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('ConfigInstance', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -148,16 +192,18 @@ export const useFFI: UseServerModule = app => {
 
     res.send(
       makeSuccess({
-        status: instData[uuid].wrapper.SetInstanceOption(
-          req.body.key as number,
-          req.body.value as string
-        ),
+        status: instData[uuid].wrapper.SetInstanceOption(data.key, data.value),
       })
     )
   })
 
   app.post('/api/appendTask', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('AppendTask', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -166,16 +212,18 @@ export const useFFI: UseServerModule = app => {
 
     res.send(
       makeSuccess({
-        taskId: instData[uuid].wrapper.AppendTask(
-          req.body.type as string,
-          JSON.stringify(req.body.param)
-        ),
+        taskId: instData[uuid].wrapper.AppendTask(data.type, JSON.stringify(data.param)),
       })
     )
   })
 
   app.post('/api/configTask', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('ConfigTask', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -184,16 +232,18 @@ export const useFFI: UseServerModule = app => {
 
     res.send(
       makeSuccess({
-        status: instData[uuid].wrapper.SetTaskParam(
-          req.body.id as number,
-          JSON.stringify(req.body.param)
-        ),
+        status: instData[uuid].wrapper.SetTaskParam(data.id, JSON.stringify(data.param)),
       })
     )
   })
 
   app.post('/api/start', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Start', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -208,7 +258,12 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/stop', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Stop', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -223,7 +278,12 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/connect', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Connect', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -232,22 +292,17 @@ export const useFFI: UseServerModule = app => {
 
     const d = instData[uuid]
 
-    const callId = d.wrapper.AsyncConnect(
-      getDefaultAdb(),
-      req.body.address ?? '',
-      req.body.config ?? ''
-    )
-    d.bind.push((code, data) => {
-      if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
-        res.send(makeSuccess(data))
-        return false
-      }
-      return true
-    })
+    const callId = d.wrapper.AsyncConnect(getDefaultAdb(), data.address ?? '', data.config ?? '')
+    d.bind.push(makeAsyncCallTracker(callId, res))
   })
 
   app.post('/api/click', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Click', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -256,18 +311,17 @@ export const useFFI: UseServerModule = app => {
 
     const d = instData[uuid]
 
-    const callId = d.wrapper.AsyncClick(req.body.x as number, req.body.y as number)
-    d.bind.push((code, data) => {
-      if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
-        res.send(makeSuccess({}))
-        return false
-      }
-      return true
-    })
+    const callId = d.wrapper.AsyncClick(data.x, data.y)
+    d.bind.push(makeAsyncCallTracker(callId, res))
   })
 
   app.post('/api/screencap', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('Screencap', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -277,17 +331,16 @@ export const useFFI: UseServerModule = app => {
     const d = instData[uuid]
 
     const callId = d.wrapper.AsyncScreencap()
-    d.bind.push((code, data) => {
-      if (code === AsstMsg.AsyncCallInfo && data.async_call_id === callId) {
-        res.send(makeSuccess({}))
-        return false
-      }
-      return true
-    })
+    d.bind.push(makeAsyncCallTracker(callId, res))
   })
 
   app.post('/api/image', (req, res) => {
-    const uuid = req.body.uuid as string
+    const { success, errors, data } = validate('GetImage', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
 
     if (!(uuid in instData)) {
       res.send(makeError('uuid not exists'))
@@ -301,7 +354,29 @@ export const useFFI: UseServerModule = app => {
     )
   })
 
+  app.get('/api/image', (req, res) => {
+    const { success, errors, data } = validate('GetImage', req.query)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+    const uuid = data.uuid
+
+    if (!(uuid in instData)) {
+      res.send(makeError('uuid not exists'))
+      return
+    }
+
+    res.send(`<img src="data:image/png;base64,${instData[uuid].wrapper.GetImage()}" />`)
+  })
+
   app.get('/api/version', (req, res) => {
+    const { success, errors, data } = validate('Version', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+
     res.send(
       makeSuccess({
         version: loader.GetVersion() ?? 'N/A',
@@ -310,7 +385,13 @@ export const useFFI: UseServerModule = app => {
   })
 
   app.post('/api/log', (req, res) => {
-    loader.Log(req.body.level as string, req.body.message as string)
+    const { success, errors, data } = validate('Log', req.body)
+    if (!success) {
+      res.send(makeError(errors.join('\n')))
+      return
+    }
+
+    loader.Log(data.level, data.message)
 
     res.send(makeSuccess({}))
   })
